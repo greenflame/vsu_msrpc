@@ -112,6 +112,9 @@
   <ItemGroup>
     <Midl Include="Example1.idl" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ReturnCodes.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

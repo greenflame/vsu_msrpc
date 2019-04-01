@@ -8,7 +8,19 @@
 ]
 interface Example1 // The interface is named Example1
 {
-   // A function that takes a zero-terminated string.
-   void Output(
-      [in, string] const char* szOutput);
+   // Auth
+
+	typedef struct
+	{
+		char login[64];
+		char password[64];
+	} user_dto;
+
+	int sign_up(user_dto user);
+
+	int sign_in(user_dto user);
+	
+	int get_users([out, size_is(count)] user_dto* buffer, int offset, int count);
+
+   // Messages
 }
