@@ -8,19 +8,26 @@
 ]
 interface Example1 // The interface is named Example1
 {
-   // Auth
-
 	typedef struct
 	{
 		char login[64];
 		char password[64];
+		boolean online;
 	} user_dto;
 
+	typedef struct
+	{
+		user_dto from;
+		user_dto to;
+		char body[64];
+		boolean read;
+	} message_dto;
+
+
 	int sign_up(user_dto user);
-
 	int sign_in(user_dto user);
-	
-	int get_users([out, size_is(count)] user_dto* buffer, int offset, int count);
+	int get_users(user_dto user, [out, size_is(count)] user_dto* buffer, int offset, int count);
 
-   // Messages
+	int write(message_dto message);
+	int get_messages(user_dto user, [out, size_is(count)] message_dto* buffer, int offset, int count);
 }

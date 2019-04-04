@@ -1,6 +1,8 @@
 #include <iostream>
 #include <string>
 
+#include "timercpp.h"
+
 #include "../Example1/Example1.h"
 #include "../Example1/ReturnCodes.h"
 
@@ -10,13 +12,25 @@ bool logged_in = false;
 string login;
 string password;
 
+user_dto current_user()
+{
+	user_dto result;
+
+	strcpy(result.login, login.c_str());
+	strcpy(result.password, password.c_str());
+
+	return result;
+}
+
 void help()
 {
 	cout << "help [h] - show this help" << endl;
 	cout << "register - register a new account" << endl;
 	cout << "login - login using existing account" << endl;
 	cout << "logout - logout from the current account" << endl;
-	cout << "list - list all users" << endl;
+	cout << "users - list all users" << endl;
+	cout << "write - write an message" << endl;
+	cout << "messages - list last 10 messages" << endl;
 }
 
 void client_sign_on()
@@ -68,7 +82,7 @@ void client_sign_in()
 		logged_in = true;
 		cout << "Ok" << endl;
 		break;
-	case RC_USER_DOES_NOT_EXIST:
+	case RC_INVALID_CREDENTIALS:
 		cout << "Invalid credentials" << endl;
 		break;
 	default:
@@ -96,11 +110,84 @@ void list_users()
 	int offset = 0;
 	int read;
 
-	while (read = get_users(buffer, offset, 2), read != 0)
+	while (read = get_users(current_user(), buffer, offset, 2), read != 0)
 	{
 		for (int i = 0; i < read; i++)
 		{
-			cout << buffer[i].login << endl;
+			cout << buffer[i].login;
+
+			if (buffer[i].online)
+			{
+				cout << " [online]" << endl;
+			}
+			else
+			{
+				cout << " [offline]" << endl;
+			}
+		}
+
+		offset += read;
+	}
+}
+
+void write_message()
+{
+	cout << "Recipient: ";
+	
+	string recipient;
+	cin >> recipient;
+
+	cout << "Message: ";
+	string body;
+
+	getline(cin, body);
+
+	message_dto message;
+	message.from = current_user();
+	strcpy(message.to.login, recipient.c_str());
+	
+	fgets(message.body, 60, stdin);
+	message.body[strlen(message.body) - 1] = 0;
+
+	int result = write(message);
+
+	switch (result)
+	{
+	case RC_OK:
+		cout << "Ok" << endl;
+		break;
+	case RC_INVALID_CREDENTIALS:
+		cout << "Login or password is not valid" << endl;
+		break;
+	case RC_INVALID_RECIPIENT:
+		cout << "Invalid recipient username" << endl;
+		break;
+	}
+}
+
+void list_messages()
+{
+	message_dto buffer[2];
+	const int buffer_size = 2;
+	const int max_read = 10;
+
+	int offset = 0;
+	int read;
+
+	while (read = get_messages(current_user(), buffer, offset, buffer_size), read != 0 && offset < max_read)
+	{
+		for (int i = 0; i < read; i++)
+		{
+			cout << "[" << buffer[i].from.login << " -> " << buffer[i].to.login << "]" << buffer[i].body;
+
+			if (!buffer[i].read)
+			{
+				cout << " [new]" << endl;
+			}
+			else
+			{
+				cout << " [read]" << endl;
+			}
 		}
 
 		offset += read;
@@ -138,7 +225,7 @@ void loop()
 			continue;
 		}
 
-		if (command == "list")
+		if (command == "users")
 		{
 			if (!logged_in)
 			{
@@ -147,6 +234,30 @@ void loop()
 			}
 
 			list_users();
+			continue;
+		}
+
+		if (command == "write")
+		{
+			if (!logged_in)
+			{
+				warn_login();
+				continue;
+			}
+
+			write_message();
+			continue;
+		}
+
+		if (command == "messages")
+		{
+			if (!logged_in)
+			{
+				warn_login();
+				continue;
+			}
+
+			list_messages();
 			continue;
 		}
 

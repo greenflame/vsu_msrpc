@@ -2,33 +2,93 @@
 #include <string>
 #include <vector>
 #include <mutex>
+#include <ctime>
 
 #include "../Example1/Example1.h"
 #include "../Example1/ReturnCodes.h"
 
 using namespace std;
 
-class user
+class User
 {
 public:
 	string login;
 	string password;
 	int last_activity;
+
+	User(user_dto dto)
+	{
+		login = dto.login;
+		password = dto.password;
+
+		update_last_activity();
+	}
+
+	user_dto to_dto(boolean include_password = false) const
+	{
+		user_dto dto;
+
+		strcpy(dto.login, login.c_str());
+
+		if (include_password)
+		{
+			strcpy(dto.login, login.c_str());
+		}
+		else
+		{
+			strcpy(dto.password, "");
+		}
+
+		dto.online = time(nullptr) - last_activity < 1000 * 60;
+
+		return dto;
+	}
+
+	void update_last_activity()
+	{
+		last_activity = time(nullptr);
+	}
 };
 
-class message
+class Message
 {
 public:
-	user* from;
-	user* to;
+	User* from;
+	User* to;
+
 	string body;
 	int timestamp;
 	bool read;
+
+	Message(User* from, User* to, string body)
+	{
+		this->from = from;
+		this->to = to;
+		this->body = body;
+
+		read = false;
+		timestamp = time(nullptr);
+	}
+
+	message_dto to_dto() const
+	{
+		message_dto dto;
+
+		dto.from = from->to_dto();
+		dto.to = to->to_dto();
+
+		strcpy(dto.body, body.c_str());
+		dto.read = read;
+
+		return dto;
+	}
 };
 
-vector<user*> users;
+vector<User*> users;
 
-user* get_user(string login)
+vector<Message*> messages;
+
+User* get_user(string login)
 {
 	for (auto u : users)
 	{
@@ -41,6 +101,18 @@ user* get_user(string login)
 	return nullptr;
 }
 
+User* get_user(const user_dto dto)
+{
+	const auto user = get_user(dto.login);
+
+	if (user->password != string(dto.password))
+	{
+		return nullptr;
+	}
+
+	return user;
+}
+
 int sign_up(user_dto dto)
 {
 	auto u = get_user(dto.login);
@@ -51,44 +123,123 @@ int sign_up(user_dto dto)
 		return RC_USER_ALREADY_EXISTS;
 	}
 
-	u = new user();
-	u->login = dto.login;
-	u->password = dto.password;
+	users.push_back(new User(dto));
 
-	users.push_back(u);
-
-	cout << "User signed up: " + u->login << endl;
+	cout << "User signed up: " + (new User(dto))->login << endl;
 	return RC_OK;
 }
 
 int sign_in(user_dto dto)
 {
-	auto u = get_user(dto.login);
+	auto u = get_user(dto);
 
-	if (u != nullptr)
+	if (u == nullptr)
 	{
-		cout << "User signed in: " + u->login << endl;
-		return RC_OK;
+		cout << "User sign in error: " << dto.login << endl;
+		return RC_INVALID_CREDENTIALS;
 	}
 
-	cout << "User sign in error: " << dto.login << endl;
-	return RC_USER_DOES_NOT_EXIST;
+	u->update_last_activity();
+
+	cout << "User signed in: " + u->login << endl;
+	return RC_OK;
 }
 
-int get_users(user_dto* buffer, int offset, int count)
+int get_users(user_dto user, user_dto* buffer, int offset, int count)
 {
+	auto u = get_user(user);
+
+	if (u == nullptr)
+	{
+		return 0;
+	}
+
+	u->update_last_activity();
+
 	int read = 0;
 
 	for (auto i = offset; i < offset + count && i < users.size(); i++)
 	{
-		strcpy(buffer[read].login, users[i]->login.c_str());
-		strcpy(buffer[read].password, "");
-
+		buffer[read] = users[i]->to_dto();
 		read++;
 	}
 
 	return read;
 }
+
+int write(message_dto dto)
+{
+	auto from = get_user(dto.from);
+
+	if (from == nullptr)
+	{
+		return RC_INVALID_CREDENTIALS;
+	}
+
+	from->update_last_activity();
+
+	auto to = get_user(dto.to.login);
+
+	if (to == nullptr)
+	{
+		return RC_INVALID_RECIPIENT;
+	}
+
+	messages.push_back(new Message(from, to, dto.body));
+
+	cout << "New message form " << from->login << " to " << to->login << ": " << dto.body << endl;
+	return RC_OK;
+}
+
+int get_messages(user_dto user, message_dto* buffer, int offset, int count)
+{
+	auto u = get_user(user);
+
+	if (u == nullptr)
+	{
+		return 0;
+	}
+
+	int pos = messages.size() - 1;
+	int skipped = 0;
+
+	while (skipped != offset && pos != -1)
+	{
+		if (messages[pos]->from->login == u->login || messages[pos]->to->login == u->login)
+		{
+			skipped++;
+		}
+
+		pos--;
+	}
+
+	if (skipped != offset)
+	{
+		return 0;
+	}
+
+	int result = 0;
+
+	while (result != count && pos != -1)
+	{
+		if (messages[pos]->from->login == u->login || messages[pos]->to->login == u->login)
+		{
+			buffer[result] = messages[pos]->to_dto();
+
+			if (messages[pos]->to->login == u->login)
+			{
+				messages[pos]->read = true;
+			}
+
+			result++;
+		}
+
+		pos--;
+	}
+
+	return result;
+}
+
 
 /* STARTUP */
 

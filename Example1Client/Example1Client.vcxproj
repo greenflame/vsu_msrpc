@@ -59,6 +59,8 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <LanguageStandard>
+      </LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -105,6 +107,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Example1\Example1.h" />
+    <ClInclude Include="timercpp.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Example1\Example1.vcxproj">

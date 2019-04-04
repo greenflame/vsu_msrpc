@@ -1,5 +1,7 @@
 DebugObj
 DebugExe
+ReleaseObj
+ReleaseExe
 Example1/*.h
 Example1/*.c
 
