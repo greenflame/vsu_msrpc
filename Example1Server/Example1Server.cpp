@@ -3,6 +3,8 @@
 #include <vector>
 #include <mutex>
 #include <ctime>
+#include <fstream>
+#include <filesystem>
 
 #include "../Example1/Example1.h"
 #include "../Example1/ReturnCodes.h"
@@ -86,7 +88,7 @@ public:
 
 vector<User*> users;
 
-vector<Message*> messages;
+vector<Message*> messages_;
 
 User* get_user(string login)
 {
@@ -167,7 +169,7 @@ int get_users(user_dto user, user_dto* buffer, int offset, int count)
 	return read;
 }
 
-int write(message_dto dto)
+int write_message(message_dto dto)
 {
 	auto from = get_user(dto.from);
 
@@ -185,13 +187,13 @@ int write(message_dto dto)
 		return RC_INVALID_RECIPIENT;
 	}
 
-	messages.push_back(new Message(from, to, dto.body));
+	messages_.push_back(new Message(from, to, dto.body));
 
 	cout << "New message form " << from->login << " to " << to->login << ": " << dto.body << endl;
 	return RC_OK;
 }
 
-int get_messages(user_dto user, message_dto* buffer, int offset, int count)
+int read_messages(user_dto user, message_dto* buffer, int offset, int count)
 {
 	auto u = get_user(user);
 
@@ -200,12 +202,12 @@ int get_messages(user_dto user, message_dto* buffer, int offset, int count)
 		return 0;
 	}
 
-	int pos = messages.size() - 1;
+	int pos = messages_.size() - 1;
 	int skipped = 0;
 
 	while (skipped != offset && pos != -1)
 	{
-		if (messages[pos]->from->login == u->login || messages[pos]->to->login == u->login)
+		if (messages_[pos]->from->login == u->login || messages_[pos]->to->login == u->login)
 		{
 			skipped++;
 		}
@@ -222,13 +224,13 @@ int get_messages(user_dto user, message_dto* buffer, int offset, int count)
 
 	while (result != count && pos != -1)
 	{
-		if (messages[pos]->from->login == u->login || messages[pos]->to->login == u->login)
+		if (messages_[pos]->from->login == u->login || messages_[pos]->to->login == u->login)
 		{
-			buffer[result] = messages[pos]->to_dto();
+			buffer[result] = messages_[pos]->to_dto();
 
-			if (messages[pos]->to->login == u->login)
+			if (messages_[pos]->to->login == u->login)
 			{
-				messages[pos]->read = true;
+				messages_[pos]->read = true;
 			}
 
 			result++;
@@ -240,6 +242,45 @@ int get_messages(user_dto user, message_dto* buffer, int offset, int count)
 	return result;
 }
 
+const string storage_directory_name = "storage";
+
+void file_write(const char filename[256], char* buffer, long long offset, int length)
+{
+	char name[128], extension[128];
+	_splitpath(filename, nullptr, nullptr, name, extension);
+
+	ofstream out(storage_directory_name + "\\" + name + extension, ios::out | ios::binary | ios::app);
+	out.seekp(offset, ios_base::beg);
+	out.write(buffer, length);
+	out.close();
+}
+
+int file_read(const char filename[256], char* buffer, long long offset, int length)
+{
+	ifstream in(storage_directory_name + "\\" + filename, ios::binary | ios::in);
+
+	if (!in.good())
+	{
+		return 0;
+	}
+
+	in.seekg(offset, ios_base::beg);
+	in.read(buffer, length);
+	int read = in.gcount();
+	in.close();
+
+	return read;
+}
+
+void init_storage_directory()
+{
+	if (experimental::filesystem::exists(storage_directory_name))
+	{
+		experimental::filesystem::remove_all(storage_directory_name);
+	}
+
+	experimental::filesystem::create_directory(storage_directory_name);
+}
 
 /* STARTUP */
 
@@ -251,6 +292,8 @@ RPC_STATUS CALLBACK SecurityCallback(RPC_IF_HANDLE /*hInterface*/, void* /*pBind
 
 int main()
 {
+	init_storage_directory();
+
 	RPC_STATUS status;
 
 	// Uses the protocol combined with the endpoint for receiving

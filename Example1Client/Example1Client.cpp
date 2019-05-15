@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <fstream>
 
 #include "timercpp.h"
 
@@ -8,19 +9,9 @@
 
 using namespace std;
 
+user_dto current_user;
+
 bool logged_in = false;
-string login;
-string password;
-
-user_dto current_user()
-{
-	user_dto result;
-
-	strcpy(result.login, login.c_str());
-	strcpy(result.password, password.c_str());
-
-	return result;
-}
 
 void help()
 {
@@ -30,20 +21,17 @@ void help()
 	cout << "logout - logout from the current account" << endl;
 	cout << "users - list all users" << endl;
 	cout << "write - write an message" << endl;
-	cout << "messages - list last 10 messages" << endl;
+	cout << "read - list last 10 messages" << endl;
 }
 
 void client_sign_on()
 {
-	string login, password;
-	cout << "Login: ";
-	cin >> login;
-	cout << "Password: ";
-	cin >> password;
-
 	user_dto u;
-	strcpy(u.login, login.c_str());
-	strcpy(u.password, password.c_str());
+
+	cout << "Login: ";
+	scanf("%s", u.login);
+	cout << "Password: ";
+	scanf("%s", u.password);
 
 	int result = sign_up(u);
 
@@ -62,23 +50,19 @@ void client_sign_on()
 
 void client_sign_in()
 {
-	string l, p;
-	cout << "Login: ";
-	cin >> l;
-	cout << "Password: ";
-	cin >> p;
-
 	user_dto u;
-	strcpy(u.login, l.c_str());
-	strcpy(u.password, p.c_str());
+
+	cout << "Login: ";
+	scanf("%s", u.login);
+	cout << "Password: ";
+	scanf("%s", u.password);
 
 	int result = sign_in(u);
 
 	switch (result)
 	{
 	case RC_OK:
-		login = l;
-		password = p;
+		current_user = u;
 		logged_in = true;
 		cout << "Ok" << endl;
 		break;
@@ -92,8 +76,9 @@ void client_sign_in()
 
 void sign_out()
 {
-	login = "";
-	password = "";
+	strcpy(current_user.login, "");
+	strcpy(current_user.password, "");
+
 	logged_in = false;
 
 	cout << "Ok" << endl;
@@ -110,7 +95,7 @@ void list_users()
 	int offset = 0;
 	int read;
 
-	while (read = get_users(current_user(), buffer, offset, 2), read != 0)
+	while (read = get_users(current_user, buffer, offset, 2), read != 0)
 	{
 		for (int i = 0; i < read; i++)
 		{
@@ -132,24 +117,20 @@ void list_users()
 
 void write_message()
 {
+	message_dto message;
+	message.from = current_user;
+
 	cout << "Recipient: ";
 	
 	string recipient;
-	cin >> recipient;
+	scanf("%s", message.to.login);
 
 	cout << "Message: ";
-	string body;
-
-	getline(cin, body);
-
-	message_dto message;
-	message.from = current_user();
-	strcpy(message.to.login, recipient.c_str());
-	
+	fgets(message.body, 60, stdin);
 	fgets(message.body, 60, stdin);
 	message.body[strlen(message.body) - 1] = 0;
 
-	int result = write(message);
+	int result = write_message(message);
 
 	switch (result)
 	{
@@ -174,7 +155,7 @@ void list_messages()
 	int offset = 0;
 	int read;
 
-	while (read = get_messages(current_user(), buffer, offset, buffer_size), read != 0 && offset < max_read)
+	while (read = read_messages(current_user, buffer, offset, buffer_size), read != 0 && offset < max_read)
 	{
 		for (int i = 0; i < read; i++)
 		{
@@ -192,6 +173,59 @@ void list_messages()
 
 		offset += read;
 	}
+}
+
+void upload()
+{
+	cout << "File name: ";
+	string filename;
+	cin >> filename;
+
+	ifstream in(filename, ios::in | ios::binary);
+
+	if (!in.good())
+	{
+		cout << "File is not good" << endl;
+		return;
+	}
+
+	char buffer[256];
+	long long offset = 0;
+
+	while (in.read(buffer, 256), in.gcount() != 0)
+	{
+		file_write(filename.c_str(), buffer, offset, in.gcount());
+		offset += in.gcount();
+	}
+
+	in.close();
+
+	cout << "Ok" << endl;
+}
+
+void download()
+{
+	cout << "File name: ";
+	string filename;
+	cin >> filename;
+
+	ofstream out(filename, ios::out | ios::binary | ios::app);
+
+	char buffer[256];
+	long long offset = 0;
+	int read;
+
+	auto sdf = out.good();
+
+	while (read = file_read(filename.c_str(), buffer, offset, 256), read != 0)
+	{
+		out.write(buffer, read);
+		offset += read;
+	}
+
+	out.close();
+
+	cout << "Ok" << endl;
 }
 
 void loop()
@@ -249,7 +283,7 @@ void loop()
 			continue;
 		}
 
-		if (command == "messages")
+		if (command == "read")
 		{
 			if (!logged_in)
 			{
@@ -258,6 +292,30 @@ void loop()
 			}
 
 			list_messages();
+			continue;
+		}
+
+		if (command == "upload")
+		{
+			//if (!logged_in)
+			//{
+			//	warn_login();
+			//	continue;
+			//}
+
+			upload();
+			continue;
+		}
+
+		if (command == "download")
+		{
+			//if (!logged_in)
+			//{
+			//	warn_login();
+			//	continue;
+			//}
+
+			download();
 			continue;
 		}
 

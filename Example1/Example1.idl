@@ -28,6 +28,9 @@ interface Example1 // The interface is named Example1
 	int sign_in(user_dto user);
 	int get_users(user_dto user, [out, size_is(count)] user_dto* buffer, int offset, int count);
 
-	int write(message_dto message);
-	int get_messages(user_dto user, [out, size_is(count)] message_dto* buffer, int offset, int count);
+	int write_message(message_dto message);
+	int read_messages(user_dto user, [out, size_is(count)] message_dto* buffer, int offset, int count);
+
+	void file_write(const char filename[256], [size_is(length)] char* buffer, long long offset, int length);
+	int file_read(const char filename[256], [out, size_is(length)] char* buffer, long long offset, int length);
 }
